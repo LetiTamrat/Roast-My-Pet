@@ -1,6 +1,5 @@
 {
   "crons": [
-    { "path": "/api/cron/cleanup-anon-roasts", "schedule": "0 4 * * *" },
-    { "path": "/api/cron/refresh-top-cache", "schedule": "*/15 * * * *" }
+    { "path": "/api/cron/cleanup-anon-roasts", "schedule": "0 4 * * *" }
   ]
 }
