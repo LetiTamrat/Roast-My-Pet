@@ -113,7 +113,7 @@ export async function renderMeme(args: RenderArgs): Promise<Buffer> {
       },
     }
   );
-
+//something
   const png = new Resvg(svg, {
     fitTo: { mode: "width", value: width },
     background: "#FFFBF5",
