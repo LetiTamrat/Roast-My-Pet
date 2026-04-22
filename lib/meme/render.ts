@@ -3,6 +3,7 @@ import { Resvg } from "@resvg/resvg-js";
 import sharp from "sharp";
 import { loadFonts } from "./fonts";
 import { getLogoDataUrl } from "./logo";
+import { loadEmoji } from "./emoji";
 import { ClassicTemplate } from "./templates/classic";
 import { PolaroidTemplate } from "./templates/polaroid";
 import { TabloidTemplate } from "./templates/tabloid";
@@ -103,6 +104,13 @@ export async function renderMeme(args: RenderArgs): Promise<Buffer> {
         weight: f.weight,
         style: f.style,
       })),
+      loadAdditionalAsset: async (code: string, segment: string) => {
+        if (code === "emoji") {
+          const url = await loadEmoji(segment);
+          if (url) return url;
+        }
+        return segment;
+      },
     }
   );
 

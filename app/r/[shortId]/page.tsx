@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { ArrowLeft } from "lucide-react";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { MemeCard } from "@/components/meme-card";
@@ -11,7 +12,7 @@ import { ReactionBar } from "@/components/reaction-bar";
 import { REACTION_EMOJIS } from "@/lib/reactions";
 import { Button } from "@/components/ui/button";
 import { supabaseService } from "@/lib/supabase/server";
-import { absoluteUrl } from "@/lib/utils";
+import { absoluteUrl, formatRelativeTime } from "@/lib/utils";
 import { getSession } from "@/lib/auth/session";
 import { ResultClient } from "./result-client";
 import { MoreLikeThis } from "./more-like-this";
@@ -22,6 +23,12 @@ export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ shortId: string }>;
+}
+
+interface CreatorInfo {
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
 }
 
 async function fetchRoast(shortId: string) {
@@ -41,6 +48,16 @@ async function fetchRoast(shortId: string) {
     .select("emoji")
     .eq("roast_id", roast.id);
 
+  let creator: CreatorInfo | null = null;
+  if (roast.user_id) {
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("username, display_name, avatar_url")
+      .eq("id", roast.user_id)
+      .maybeSingle();
+    if (profile) creator = profile as CreatorInfo;
+  }
+
   const memes: Record<string, string> = {};
   for (const a of assets || []) memes[a.format] = a.url;
 
@@ -48,7 +65,7 @@ async function fetchRoast(shortId: string) {
   for (const emoji of REACTION_EMOJIS) counts[emoji] = 0;
   for (const r of reactions || []) counts[r.emoji] = (counts[r.emoji] ?? 0) + 1;
 
-  return { roast, memes, counts };
+  return { roast, memes, counts, creator };
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -84,57 +101,97 @@ export default async function RoastPage({ params }: PageProps) {
   const { shortId } = await params;
   const data = await fetchRoast(shortId);
   if (!data) notFound();
-  const { roast, memes, counts } = data;
+  const { roast, memes, counts, creator } = data;
 
   const session = await getSession().catch(() => null);
   const ownedByCurrentUser = !!session && roast.user_id === session.userId;
 
   const shareUrl = absoluteUrl(`/r/${shortId}`);
+  const createdAgo = formatRelativeTime(roast.created_at);
 
   return (
     <>
       <Header />
-      <main id="main" className="px-4 pb-36 pt-8 sm:px-6 md:pb-16">
-        <div className="mx-auto w-full max-w-[640px]">
-          <Link
-            href="/gallery"
-            className="text-xs font-semibold text-muted-foreground hover:text-foreground"
-          >
-            ← Back to gallery
-          </Link>
+      <main id="main" className="px-4 pb-24 pt-6 sm:px-6">
+        <div className="mx-auto w-full max-w-[680px]">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/gallery"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back to gallery
+            </Link>
+            <span className="text-xs text-muted-foreground">{createdAgo}</span>
+          </div>
 
-          <div className="mt-6">
+          {/* MEME + headline combined into a single showcase card */}
+          <div className="mt-6 overflow-hidden rounded-3xl border border-border bg-card shadow-card">
             {memes.square ? (
               <MemeCard src={memes.square} alt={roast.roast_text} priority />
             ) : (
-              <div className="aspect-square w-full rounded-2xl bg-muted" />
+              <div className="aspect-square w-full bg-muted" />
             )}
+
+            <div className="space-y-5 px-6 py-7 text-center">
+              <div className="flex items-center justify-center">
+                <ArchetypeBadge
+                  archetype={roast.archetype}
+                  emoji={roast.archetype_emoji}
+                />
+              </div>
+              <h1 className="font-display text-2xl font-bold leading-snug sm:text-3xl md:text-4xl">
+                {roast.roast_text}
+              </h1>
+              {roast.follow_up && (
+                <p className="text-sm italic text-muted-foreground sm:text-base">
+                  &ldquo;{roast.follow_up}&rdquo;
+                </p>
+              )}
+              {creator && (
+                <Link
+                  href={`/${creator.username}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1.5 text-xs font-semibold transition-colors hover:border-primary/50 hover:bg-muted"
+                >
+                  <div className="relative h-5 w-5 shrink-0 overflow-hidden rounded-full bg-muted">
+                    {creator.avatar_url ? (
+                      <Image
+                        src={creator.avatar_url}
+                        alt={creator.username}
+                        fill
+                        sizes="20px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-[10px]">
+                        🐾
+                      </span>
+                    )}
+                  </div>
+                  <span>
+                    Roasted by{" "}
+                    <span className="font-bold text-primary">
+                      @{creator.username}
+                    </span>
+                  </span>
+                </Link>
+              )}
+            </div>
           </div>
 
-          <div className="mt-8 space-y-4 text-center">
-            <ArchetypeBadge
-              archetype={roast.archetype}
-              emoji={roast.archetype_emoji}
-            />
-            <h1 className="font-display text-2xl font-bold leading-snug sm:text-3xl md:text-4xl">
-              {roast.roast_text}
-            </h1>
-            {roast.follow_up && (
-              <p className="text-base text-muted-foreground italic">
-                &ldquo;{roast.follow_up}&rdquo;
-              </p>
-            )}
-          </div>
-
-          <div className="mt-8">
+          {/* REACTIONS */}
+          <div className="mt-6">
             <ReactionBar shortId={shortId} initialCounts={counts} />
           </div>
 
-          <div className="mt-8 rounded-2xl border border-border bg-card p-5 shadow-soft">
-            <h2 className="font-display text-lg font-bold">Share this roast</h2>
-            <p className="mb-4 text-xs text-muted-foreground">
-              Drop it in the group chat. They'll forgive you eventually.
-            </p>
+          {/* SHARE */}
+          <section className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
+            <div className="mb-4">
+              <h2 className="font-display text-lg font-bold">Spread the chaos</h2>
+              <p className="text-xs text-muted-foreground">
+                One tap to the group chat. They'll forgive you eventually.
+              </p>
+            </div>
             <ShareSheet
               shortId={shortId}
               shareUrl={shareUrl}
@@ -142,8 +199,9 @@ export default async function RoastPage({ params }: PageProps) {
               storyUrl={memes.story || memes.square || ""}
               roastText={roast.roast_text}
             />
-          </div>
+          </section>
 
+          {/* OWNER ACTIONS (toggle, regenerate, delete) */}
           <ResultClient
             shortId={shortId}
             initialIsPublic={roast.is_public}
@@ -155,9 +213,10 @@ export default async function RoastPage({ params }: PageProps) {
             ownedByCurrentUser={ownedByCurrentUser}
           />
 
-          <div className="mt-10 flex justify-center">
-            <Button asChild variant="outline">
-              <Link href="/upload">Roast another pet →</Link>
+          {/* CTA */}
+          <div className="mt-10 flex flex-col items-center gap-2">
+            <Button asChild size="lg">
+              <Link href="/upload">Roast another pet 🔥</Link>
             </Button>
           </div>
 
@@ -180,10 +239,18 @@ export default async function RoastPage({ params }: PageProps) {
             description: roast.roast_text,
             image: memes.square,
             url: shareUrl,
+            ...(creator
+              ? {
+                  author: {
+                    "@type": "Person",
+                    name: creator.display_name || `@${creator.username}`,
+                    url: absoluteUrl(`/${creator.username}`),
+                  },
+                }
+              : {}),
           }),
         }}
       />
     </>
   );
 }
-
