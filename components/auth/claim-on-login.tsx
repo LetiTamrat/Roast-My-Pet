@@ -52,11 +52,16 @@ async function claimAll(): Promise<void> {
 
 export function ClaimOnLogin() {
   useEffect(() => {
-    const supabase = supabaseBrowser();
-    // Run once on mount in case a session already exists server-side.
+    let supabase;
+    try {
+      supabase = supabaseBrowser();
+    } catch (err) {
+      console.warn("[claim-on-login] Supabase browser client unavailable:", err);
+      return;
+    }
     supabase.auth.getSession().then(({ data }) => {
       if (data?.session?.user) claimAll();
-    });
+    }).catch(() => {});
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         claimAll();
