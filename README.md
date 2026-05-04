@@ -5,7 +5,7 @@ A viral web app that roasts your pet with AI and produces a shareable meme in ab
 > *Every pet is cute. Some just deserve a little roasting.*
 
 ## Tech stack
-
+- Leti is a bitch
 - Next.js 15 (App Router, TypeScript strict)
 - Tailwind CSS v4 + shadcn-style primitives
 - Framer Motion, react-hook-form + Zod, react-dropzone, browser-image-compression
